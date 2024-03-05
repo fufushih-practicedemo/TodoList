@@ -9,7 +9,7 @@ const todos = [
     }
 ];
 
-const requestListener = (req, res) => {
+const sendSuccessRes = (res, data) => {
     const headers = {
         "Access-Control-Allow-Headers": "Content-Type, Authorization, Content-Length, X-Requested-With",
         "Access-Control-Allow-Origin": "*",
@@ -18,7 +18,11 @@ const requestListener = (req, res) => {
     };
 
     res.writeHead(200, headers);
-    
+    res.write(JSON.stringify({ status: "success", data }));
+    res.end();
+};
+
+const requestListener = (req, res) => {
     let body = "";
     req.on("data", chunk => {
         body += chunk;
@@ -29,96 +33,72 @@ const requestListener = (req, res) => {
         return;
     }
 
+    // Get all todos
     if (req.url === "/todos" && req.method === "GET") {
-        res.write(JSON.stringify(
-            { 
-                "status": "success",
-                "data": todos
-            }
-        ));
-        res.end();
+        sendSuccessRes(res, todos);
         return;
     }
 
+    // Create a new todo
     if (req.url === "/todos" && req.method === "POST") {
         req.on("end", () => {
             try {
-                const title = JSON.parse(body).title;
-                if (!title) {
+                const { title } = JSON.parse(body);
+                if (title) {
+                    const todo = {
+                        title,
+                        id: uuidv4(),
+                    };
+                    todos.push(todo);
+        
+                    sendSuccessRes(res, todos);
+                } else {
                     errHandle(res);
-                    return;
                 }
-
-                const todo = {
-                    title,
-                    id: uuidv4(),
-                };
-                todos.push(todo);
-
-                res.write(JSON.stringify(
-                    { 
-                        "status": "success",
-                        "data": todos
-                    }
-                ));
-                res.end();
-            } catch(err) {
+            } catch (err) {
                 errHandle(res);
             }
         });
         return;
     }
 
+    // Delete all todos
     if (req.url === "/todos" && req.method === "DELETE") {
         todos.length = 0;
-        res.write(JSON.stringify(
-            { 
-                "status": "success",
-                "data": todos,
-            }
-        ));
-        res.end();
+        sendSuccessRes(res, todos);
         return;
     }
 
+    // Delete todo with id
     if (req.url.startsWith("/todos/") && req.method === "DELETE") {
         const id = req.url.split("/").pop();
         const index = todos.findIndex(element => element.id === id);
-        if (index === -1) {
+        if (index !== -1) {
+            todos.splice(index, 1);
+            
+            sendSuccessRes(res, todos);
+            res.end();
+        } else {
             errHandle(res);
-            return;
         }
-
-        todos.splice(index, 1);
-        res.write(JSON.stringify(
-            { 
-                "status": "success",
-                "data": todos,
-            }
-        ));
-        res.end();
         return;
     }
 
+    // Update todo with id
     if (req.url.startsWith("/todos/") && req.method === "PATCH") {
         req.on("end", () => {
             try {
-                const title = JSON.parse(body).title;
+                const { title } = JSON.parse(body);
                 const id = req.url.split("/").pop();
                 const index = todos.findIndex(element => element.id === id);
-                if (!title || index === -1) {
+                
+                if(title && index !== -1) {
+                    todos[index].title = title;
+                    
+                    sendSuccessRes(res, todos);
+                } else {
                     errHandle(res);
-                    return;
                 }
-
-                todos[index].title = title;
-                res.write(JSON.stringify(
-                    { 
-                        "status": "success",
-                        "data": todos,
-                    }
-                ));
-                res.end();
             } catch {
                 errHandle(res);
             }
@@ -127,12 +107,9 @@ const requestListener = (req, res) => {
     }
 
     res.writeHead(404);
-    res.write(JSON.stringify(
-        { 
-            "status": "failed",
-            "message": "Resource not found"
-        }
-    ));
+    res.write(JSON.stringify({ 
+        "status": "failed", "message": "Resource not found" 
+    }));
     res.end();
 };
 
