@@ -10,7 +10,7 @@ function errorHandle(res) {
     res.write(JSON.stringify(
         { 
             "status": "error",
-            "message": "Route not found"
+            "message": "Todo is not found or invalid request."
         }
     ));
     res.end();
